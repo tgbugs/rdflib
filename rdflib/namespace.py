@@ -328,7 +328,7 @@ class NamespaceManager(object):
         if not uri in self.__cache:
             name = None
             for lennamespace, prefix, namespace in self.ordered_prefixnames:
-                if namespace in uri:
+                if uri.startswith(namespace):
                     name = uri[-lennamespace:]
                     break
 
