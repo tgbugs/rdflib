@@ -198,6 +198,17 @@ class NodeInt(NodeLiteral):
     def range(self):
         return rdflib.XSD.int
 
+class NodeBool(NodeLiteral):
+    def __call__(self, x):
+        if not self.f:
+            return rdflib.Literal(bool(x))
+        if callable(self.f):
+            return rdflib.Literal(bool(self.f(x)))
+        raise Exception("Function passed to bool is not callable")
+
+    def range(self):
+        return rdflib.XSD.bool
+
 
 class NodeReplace(NodeMaker):
     def __init__(self, a, b):
@@ -246,7 +257,7 @@ def _config_uri(prefix=None, class_=None):
 
 
 def _config_literal():
-    return NodeLiteral
+    return NodeLiteral()
 
 
 def _config_float(f=None):
@@ -259,6 +270,9 @@ def _config_replace(a, b):
 
 def _config_int(f=None):
     return NodeInt(f)
+
+def _config_bool(f=None):
+    return NodeBool(f)
 
 
 def _config_date(format_):
@@ -275,7 +289,8 @@ config_functions = {"ignore": _config_ignore,
                     "int": _config_int,
                     "date": _config_date,
                     "split": _config_split,
-                    "replace": _config_replace
+                    "replace": _config_replace,
+                    "bool": _config_bool,
                     }
 
 
