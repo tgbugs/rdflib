@@ -286,7 +286,8 @@ class NamespaceManager(object):
         self.__cache = {}
         self.__log = None
         self.__trie = {}
-        self.local_sanity = {}
+        for p, n in self.namespaces():  # self.bind is not always called
+            insert_trie(self.__trie, n)
         self.bind("xml", "http://www.w3.org/XML/1998/namespace")
         self.bind("rdf", RDF)
         self.bind("rdfs", RDFS)
@@ -340,8 +341,7 @@ class NamespaceManager(object):
             namespace = get_longest_namespace(self.__trie, uri)
             if namespace is not None:
                 name = uri[len(namespace):]
-                #prefix = self.store.prefix(namespace)  # warning multiple prefixes problem
-                prefix = self.local_sanity[namespace]
+                prefix = self.store.prefix(namespace)  # warning multiple prefixes problem
             else:
                 name = None
 
@@ -388,6 +388,7 @@ class NamespaceManager(object):
 
             if replace:
                 self.store.bind(prefix, namespace)
+                insert_trie(self.__trie, namespace)
                 return
 
             # prefix already in use for different namespace
@@ -418,7 +419,6 @@ class NamespaceManager(object):
                 if override or bound_prefix.startswith("_"):  # or a generated prefix
                     self.store.bind(prefix, namespace)
         insert_trie(self.__trie, namespace)
-        self.local_sanity[namespace] = prefix
 
     def namespaces(self):
         for prefix, namespace in self.store.namespaces():
