@@ -285,6 +285,8 @@ class NamespaceManager(object):
         self.graph = graph
         self.__cache = {}
         self.__log = None
+        self.__trie = {}
+        self.local_sanity = {}
         self.bind("xml", "http://www.w3.org/XML/1998/namespace")
         self.bind("rdf", RDF)
         self.bind("rdfs", RDFS)
@@ -335,11 +337,13 @@ class NamespaceManager(object):
             )
 
         if uri not in self.__cache:
-            name = None
-            for lennamespace, prefix, namespace in self.ordered_prefixnames:
-                if uri.startswith(namespace):
-                    name = uri[-lennamespace:]
-                    break
+            namespace = get_longest_namespace(self.__trie, uri)
+            if namespace is not None:
+                name = uri[len(namespace):]
+                #prefix = self.store.prefix(namespace)  # warning multiple prefixes problem
+                prefix = self.local_sanity[namespace]
+            else:
+                name = None
 
             if name is None:
                 namespace, name = split_uri(uri)
@@ -413,8 +417,8 @@ class NamespaceManager(object):
             else:
                 if override or bound_prefix.startswith("_"):  # or a generated prefix
                     self.store.bind(prefix, namespace)
-
-        self.ordered_prefixnames = sorted((-len(n), p, n) for p, n in self.namespaces())
+        insert_trie(self.__trie, namespace)
+        self.local_sanity[namespace] = prefix
 
     def namespaces(self):
         for prefix, namespace in self.store.namespaces():
@@ -516,3 +520,27 @@ def split_uri(uri):
                     return (ns, ln)
             break
     raise ValueError("Can't split '{}'".format(uri))
+
+def insert_trie(trie, value):
+    if value in trie:
+        return
+    for key in trie:
+        if value.startswith(key):
+            insert_trie(trie[key], value)
+            return
+        elif key.startswith(value):
+            dict_ = trie.pop(key)
+            trie[value] = {key:dict_}
+            return
+    trie[value] = {}
+
+def get_longest_namespace(trie, value):
+    for key in trie:
+        if value.startswith(key):
+            out = get_longest_namespace(trie[key], value)
+            if out is None:
+                return key
+            else:
+                return out
+    return None
+
