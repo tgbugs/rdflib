@@ -341,7 +341,10 @@ class NamespaceManager(object):
             namespace = get_longest_namespace(self.__trie, uri)
             if namespace is not None:
                 name = uri[len(namespace):]
-                prefix = self.store.prefix(namespace)  # warning multiple prefixes problem
+                if '/' in name or '#' in name:
+                    name = None
+                else:
+                    prefix = self.store.prefix(namespace)  # warning multiple prefixes problem
             else:
                 name = None
 
