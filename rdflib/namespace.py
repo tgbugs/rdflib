@@ -348,9 +348,7 @@ class NamespaceManager(object):
             if self.__strie[namespace]:
                 pl_namespace = get_longest_namespace(self.__strie[namespace], uri)
                 if pl_namespace is not None:
-                    print('BEFORE', namespace, uri, self.__strie[namespace])
                     namespace = pl_namespace
-                    print('AFTER', namespace)
                     name = uri[len(namespace):]
 
             namespace = URIRef(namespace)
@@ -367,7 +365,6 @@ class NamespaceManager(object):
                     if not self.store.namespace(prefix):
                         break
                     num += 1
-                #print(prefix, namespace)
                 self.bind(prefix, namespace)
             self.__cache[uri] = (prefix, namespace, name)
         return self.__cache[uri]
