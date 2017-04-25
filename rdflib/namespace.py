@@ -522,7 +522,7 @@ def split_uri(uri):
             if c in ALLOWED_NAME_CHARS:
                 continue
             for j in range(-1 - i, length):
-                if category(uri[j]) in NAME_START_CATEGORIES or uri[j] == u"_":
+                if category(uri[j]) in NAME_START_CATEGORIES or uri[j] == "_":
                     ns = uri[:j]
                     if not ns:
                         break
