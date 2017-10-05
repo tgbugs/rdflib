@@ -4,7 +4,6 @@ RDFLib
 [![Coveralls branch](https://img.shields.io/coveralls/RDFLib/rdflib/master.svg)](https://coveralls.io/r/RDFLib/rdflib?branch=master)
 [![GitHub stars](https://img.shields.io/github/stars/RDFLib/rdflib.svg)](https://github.com/RDFLib/rdflib/stargazers)
 [![PyPI](https://img.shields.io/pypi/v/rdflib.svg)](https://pypi.python.org/pypi/rdflib)
-[![PyPI](https://img.shields.io/pypi/dm/rdflib.svg)](https://pypi.python.org/pypi/rdflib)
 [![PyPI](https://img.shields.io/pypi/pyversions/rdflib.svg)](https://pypi.python.org/pypi/rdflib)
 
 
@@ -53,7 +52,7 @@ exist). New Namespaces can also be defined:
 
 ```python
 
-dbpedia=Namespace('http://dbpedia.org/ontology/')
+dbpedia=rdflib.Namespace('http://dbpedia.org/ontology/')
 
 abstracts=list(x for x in g.objects(semweb, dbpedia['abstract']) if x.language=='en')
 ```
