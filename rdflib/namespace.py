@@ -285,8 +285,8 @@ class NamespaceManager(object):
         self.graph = graph
         self.__cache = {}
         self.__log = None
-        self.__trie = {}
         self.__strie = {}
+        self.__trie = {}
         for p, n in self.namespaces():  # self.bind is not always called
             insert_trie(self.__trie, str(n))
         self.bind("xml", "http://www.w3.org/XML/1998/namespace")
@@ -296,6 +296,10 @@ class NamespaceManager(object):
 
     def reset(self):
         self.__cache = {}
+        self.__strie = {}
+        self.__trie = {}
+        for p, n in self.namespaces():  # repopulate the trie
+            insert_trie(self.__trie, str(n))
 
     def __get_store(self):
         return self.graph.store
@@ -477,6 +481,7 @@ class NamespaceManager(object):
 
 
 NAME_START_CATEGORIES = ["Ll", "Lu", "Lo", "Lt", "Nl"]
+SPLIT_START_CATEGORIES = NAME_START_CATEGORIES + ['Nd']
 NAME_CATEGORIES = NAME_START_CATEGORIES + ["Mc", "Me", "Mn", "Lm", "Nd"]
 ALLOWED_NAME_CHARS = [u"\u00B7", u"\u0387", u"-", u".", u"_"]
 
@@ -513,14 +518,14 @@ def split_uri(uri):
     if uri.startswith(XMLNS):
         return (XMLNS, uri.split(XMLNS)[1])
     length = len(uri)
-    name_start_plus_nd = NAME_START_CATEGORIES + ["Nd"]
     for i in range(0, length):
         c = uri[-i - 1]
         if not category(c) in NAME_CATEGORIES:
             if c in ALLOWED_NAME_CHARS:
                 continue
             for j in range(-1 - i, length):
-                if category(uri[j]) in name_start_plus_nd or uri[j] == "_":
+                if category(uri[j]) in SPLIT_START_CATEGORIES or uri[j] == "_":
+                    # _ prevents early split, roundtrip not generate
                     ns = uri[:j]
                     if not ns:
                         break
@@ -536,10 +541,10 @@ def insert_trie(trie, value):  # aka get_subtrie_or_insert
     if value in trie:
         return trie[value]
     multi_check = False
-    for key in list(trie.keys()):
-        if value.startswith(key):
+    for key in tuple(trie.keys()):
+        if len(value) > len(key) and value.startswith(key):
             return insert_trie(trie[key], value)
-        elif key.startswith(value):
+        elif key.startswith(value):  # we know the value is not in the trie
             if not multi_check:
                 trie[value] = {}
                 multi_check = True  # there can be multiple longer existing prefixes
