@@ -314,7 +314,6 @@ class NamespaceManager(object):
             return ":".join((prefix, name))
 
     def qname_strict(self, uri):
-        print('qname strict??')
         prefix, namespace, name = self.compute_qname_strict(uri)
         if prefix == '':
             return name
@@ -401,7 +400,7 @@ class NamespaceManager(object):
                     namespace, name = split_uri(uri, NAME_START_CATEGORIES)
                 except ValueError as e:
                     message = ('This graph cannot be serialized to a strict format '
-                               f'because there is no valid way to shorten {uri}')
+                               'because there is no valid way to shorten {uri}'.format(uri))
                     raise ValueError(message) from e
                     # omitted for strict since NCNames cannot be empty
                     #namespace = URIRef(uri)
@@ -436,7 +435,6 @@ class NamespaceManager(object):
                     self.bind(prefix, namespace)
                 self.__cache_strict[uri] = (prefix, namespace, name)
 
-            print('NOT OK!?', *self.__cache_strict[uri])
             return self.__cache_strict[uri]
 
     def bind(self, prefix, namespace, override=True, replace=False):
