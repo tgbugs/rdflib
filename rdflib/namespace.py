@@ -15,7 +15,6 @@ from six.moves.urllib.parse import urldefrag
 from six.moves.urllib.parse import urljoin
 
 from rdflib.term import URIRef, Variable, _XSD_PFX, _is_valid_uri
-from IPython import embed
 
 __doc__ = """
 ===================
