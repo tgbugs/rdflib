@@ -15,6 +15,7 @@ from six.moves.urllib.parse import urldefrag
 from six.moves.urllib.parse import urljoin
 
 from rdflib.term import URIRef, Variable, _XSD_PFX, _is_valid_uri
+from IPython import embed
 
 __doc__ = """
 ===================
@@ -284,6 +285,7 @@ class NamespaceManager(object):
     def __init__(self, graph):
         self.graph = graph
         self.__cache = {}
+        self.__cache_strict = {}
         self.__log = None
         self.__strie = {}
         self.__trie = {}
@@ -311,6 +313,14 @@ class NamespaceManager(object):
             return name
         else:
             return ":".join((prefix, name))
+
+    def qname_strict(self, uri):
+        print('qname strict??')
+        prefix, namespace, name = self.compute_qname_strict(uri)
+        if prefix == '':
+            return name
+        else:
+            return ':'.join((prefix, name))
 
     def normalizeUri(self, rdfTerm):
         """
@@ -378,6 +388,57 @@ class NamespaceManager(object):
                 self.bind(prefix, namespace)
             self.__cache[uri] = (prefix, namespace, name)
         return self.__cache[uri]
+
+    def compute_qname_strict(self, uri, generate=True):
+        # code repeated to avoid branching on strict every time
+        # if output needs to be strict (e.g. for xml) then
+        # only the strict output should bear the overhead
+        prefix, namespace, name = self.compute_qname(uri)
+        if is_ncname(name):
+            return prefix, namespace, name
+        else:
+            if uri not in self.__cache_strict:
+                try:
+                    namespace, name = split_uri(uri, NAME_START_CATEGORIES)
+                except ValueError as e:
+                    message = ('This graph cannot be serialized to a strict format '
+                               f'because there is no valid way to shorten {uri}')
+                    raise ValueError(message) from e
+                    # omitted for strict since NCNames cannot be empty
+                    #namespace = URIRef(uri)
+                    #prefix = self.store.prefix(namespace)
+                    #if not prefix:
+                        #raise e
+
+                if namespace not in self.__strie:
+                    insert_strie(self.__strie, self.__trie, namespace)
+
+                # omitted for strict
+                #if self.__strie[namespace]:
+                    #pl_namespace = get_longest_namespace(self.__strie[namespace], uri)
+                    #if pl_namespace is not None:
+                        #namespace = pl_namespace
+                        #name = uri[len(namespace):]
+
+                namespace = URIRef(namespace)
+                prefix = self.store.prefix(namespace)  # warning multiple prefixes problem
+
+                if prefix is None:
+                    if not generate:
+                        raise KeyError(
+                            "No known prefix for {} and generate=False".format(namespace)
+                        )
+                    num = 1
+                    while 1:
+                        prefix = "ns%s" % num
+                        if not self.store.namespace(prefix):
+                            break
+                        num += 1
+                    self.bind(prefix, namespace)
+                self.__cache_strict[uri] = (prefix, namespace, name)
+
+            print('NOT OK!?', *self.__cache_strict[uri])
+            return self.__cache_strict[uri]
 
     def bind(self, prefix, namespace, override=True, replace=False):
 
@@ -500,27 +561,28 @@ ALLOWED_NAME_CHARS = [u"\u00B7", u"\u0387", u"-", u".", u"_", u":"]
 
 
 def is_ncname(name):
-    first = name[0]
-    if first == "_" or category(first) in NAME_START_CATEGORIES:
-        for i in range(1, len(name)):
-            c = name[i]
-            if not category(c) in NAME_CATEGORIES:
-                if c != ':' and c in ALLOWED_NAME_CHARS:
-                    continue
-                return 0
-            # if in compatibility area
-            # if decomposition(c)!='':
-            #    return 0
+    if name:
+        first = name[0]
+        if first == "_" or category(first) in NAME_START_CATEGORIES:
+            for i in range(1, len(name)):
+                c = name[i]
+                if not category(c) in NAME_CATEGORIES:
+                    if c != ':' and c in ALLOWED_NAME_CHARS:
+                        continue
+                    return 0
+                # if in compatibility area
+                # if decomposition(c)!='':
+                #    return 0
 
-        return 1
-    else:
-        return 0
+            return 1
+
+    return 0
 
 
 XMLNS = "http://www.w3.org/XML/1998/namespace"
 
 
-def split_uri(uri):
+def split_uri(uri, split_start=SPLIT_START_CATEGORIES):
     if uri.startswith(XMLNS):
         return (XMLNS, uri.split(XMLNS)[1])
     length = len(uri)
@@ -530,7 +592,7 @@ def split_uri(uri):
             if c in ALLOWED_NAME_CHARS:
                 continue
             for j in range(-1 - i, length):
-                if category(uri[j]) in SPLIT_START_CATEGORIES or uri[j] == "_":
+                if category(uri[j]) in split_start or uri[j] == "_":
                     # _ prevents early split, roundtrip not generate
                     ns = uri[:j]
                     if not ns:
