@@ -559,6 +559,7 @@ ALLOWED_NAME_CHARS = [u"\u00B7", u"\u0387", u"-", u".", u"_", u":"]
 
 def is_ncname(name):
     if name:
+        name = text_type(name)
         first = name[0]
         if first == "_" or category(first) in NAME_START_CATEGORIES:
             for i in range(1, len(name)):
@@ -632,4 +633,3 @@ def get_longest_namespace(trie, value):
             else:
                 return out
     return None
-
