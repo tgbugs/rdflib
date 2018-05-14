@@ -47,12 +47,11 @@ import math
 import base64
 import xml.dom.minidom
 
-from datetime import date, time, datetime
+from datetime import date, time, datetime, timedelta
 from re import sub, compile
 from collections import defaultdict
 
-from isodate import parse_time, parse_date, parse_datetime
-
+from isodate import parse_time, parse_date, parse_datetime, Duration, parse_duration, duration_isoformat
 
 import rdflib
 from six import PY2
@@ -420,13 +419,17 @@ class BNode(Identifier):
             clsName = self.__class__.__name__
         return """%s('%s')""" % (clsName, str(self))
 
-    def skolemize(self, authority="http://rdlib.net/"):
+    def skolemize(self, authority=None, basepath=None):
         """ Create a URIRef "skolem" representation of the BNode, in accordance
         with http://www.w3.org/TR/rdf11-concepts/#section-skolemization
 
         .. versionadded:: 4.0
         """
-        skolem = "%s%s" % (rdflib_skolem_genid, text_type(self))
+        if authority is None:
+            authority = "http://rdlib.net/"
+        if basepath is None:
+            basepath = rdflib_skolem_genid
+        skolem = "%s%s" % (basepath, text_type(self))
         return URIRef(urljoin(authority, skolem))
 
 
@@ -812,6 +815,9 @@ class Literal(Identifier):
                     return self.language > other.language
 
             if self.value != None and other.value != None:
+                if type(self.value) in _NO_TOTAL_ORDER_TYPES:
+                    comparator = _NO_TOTAL_ORDER_TYPES[type(self.value)]
+                    return comparator(self.value) > comparator(other.value)
                 return self.value > other.value
 
             if text_type(self) != text_type(other):
@@ -1071,6 +1077,9 @@ class Literal(Identifier):
                 return self.value == other
         elif isinstance(other, (date, datetime, time)):
             if self.datatype in (_XSD_DATETIME, _XSD_DATE, _XSD_TIME):
+                return self.value == other
+        elif isinstance(other, (timedelta, Duration)):
+            if self.datatype in (_XSD_DURATION, _XSD_DAYTIMEDURATION, _XSD_YEARMONTHDURATION):
                 return self.value == other
         elif isinstance(other, bool):
             if self.datatype == _XSD_BOOLEAN:
@@ -1358,8 +1367,11 @@ _XSD_BOOLEAN = URIRef(_XSD_PFX + 'boolean')
 _XSD_DATETIME = URIRef(_XSD_PFX + 'dateTime')
 _XSD_DATE = URIRef(_XSD_PFX + 'date')
 _XSD_TIME = URIRef(_XSD_PFX + 'time')
+_XSD_DURATION = URIRef(_XSD_PFX + 'duration')
+_XSD_DAYTIMEDURATION = URIRef(_XSD_PFX + 'dayTimeDuration')
+_XSD_YEARMONTHDURATION = URIRef(_XSD_PFX + 'yearMonthDuration')
 
-# TODO: duration, gYearMonth, gYear, gMonthDay, gDay, gMonth
+# TODO: gYearMonth, gYear, gMonthDay, gDay, gMonth
 
 _NUMERIC_LITERAL_TYPES = (
     _XSD_INTEGER,
@@ -1397,6 +1409,14 @@ _NUMERIC_INF_NAN_LITERAL_TYPES = (
     _XSD_DECIMAL,
 )
 
+# these are not guranteed to sort because it is not possible
+# to calculate a total order over all valid members of the type
+# the function must partition the type into subtypes that do have total orders
+_NO_TOTAL_ORDER_TYPES = {
+    datetime:lambda value:bool(value.tzinfo),
+    time:lambda value:bool(value.tzinfo),
+    xml.dom.minidom.Document:lambda value:value.toxml(),
+}
 
 def _castPythonToLiteral(obj):
     """
@@ -1437,6 +1457,8 @@ _PythonToXSD = [
     (datetime, (lambda i:i.isoformat(), _XSD_DATETIME)),
     (date, (lambda i:i.isoformat(), _XSD_DATE)),
     (time, (lambda i:i.isoformat(), _XSD_TIME)),
+    (Duration, (lambda i:duration_isoformat(i), _XSD_DURATION)),
+    (timedelta, (lambda i:duration_isoformat(i), _XSD_DAYTIMEDURATION)),
     (xml.dom.minidom.Document, (_writeXML, _RDF_XMLLITERAL)),
     # this is a bit dirty - by accident the html5lib parser produces
     # DocumentFragments, and the xml parser Documents, letting this
@@ -1452,6 +1474,9 @@ XSDToPython = {
     URIRef(_XSD_PFX + 'gYear'): parse_date,
     URIRef(_XSD_PFX + 'gYearMonth'): parse_date,
     URIRef(_XSD_PFX + 'dateTime'): parse_datetime,
+    URIRef(_XSD_PFX + 'duration'): parse_duration,
+    URIRef(_XSD_PFX + 'dayTimeDuration'): parse_duration,
+    URIRef(_XSD_PFX + 'yearMonthDuration'): parse_duration,
     URIRef(_XSD_PFX + 'string'): None,
     URIRef(_XSD_PFX + 'normalizedString'): None,
     URIRef(_XSD_PFX + 'token'): None,
