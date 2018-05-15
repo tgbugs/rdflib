@@ -392,7 +392,7 @@ class NamespaceManager(object):
         # if output needs to be strict (e.g. for xml) then
         # only the strict output should bear the overhead
         prefix, namespace, name = self.compute_qname(uri)
-        if is_ncname(name):
+        if is_ncname(text_type(name)):
             return prefix, namespace, name
         else:
             if uri not in self.__cache_strict:
@@ -559,7 +559,6 @@ ALLOWED_NAME_CHARS = [u"\u00B7", u"\u0387", u"-", u".", u"_", u":"]
 
 def is_ncname(name):
     if name:
-        name = text_type(name)
         first = name[0]
         if first == "_" or category(first) in NAME_START_CATEGORIES:
             for i in range(1, len(name)):
