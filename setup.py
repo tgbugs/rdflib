@@ -27,15 +27,11 @@ if os.environ.get('READTHEDOCS', None):
     packages.append("examples")
 
 setup(
-    name='rdflib',
+    name='neurdflib',
     version=version,
-    description="RDFLib is a Python library for working with RDF, a "
-                "simple yet powerful language for representing information.",
-    author="Daniel 'eikeon' Krech",
-    author_email="eikeon@eikeon.com",
-    maintainer="RDFLib Team",
-    maintainer_email="rdflib-dev@google.com",
-    url="https://github.com/RDFLib/rdflib",
+    description="TEMP RELEASE of new features for RDFLib",
+    maintainer_email="tgbugs@gmail.com",
+    url="https://github.com/tgbugs/rdflib",
     license="BSD-3-Clause",
     platforms=["any"],
     classifiers=[
@@ -52,29 +48,13 @@ setup(
             "Natural Language :: English",
                  ],
     long_description="""\
-RDFLib is a Python library for working with
-RDF, a simple yet powerful language for representing information.
+This is a temporary convenience package for changes waiting to be
+merged into the primary rdflib repo.
+https://github.com/RDFLib/rdflib/pull/649
 
-The library contains parsers and serializers for RDF/XML, N3,
-NTriples, Turtle, TriX, RDFa and Microdata . The library presents
-a Graph interface which can be backed by any one of a number of
-Store implementations. The core rdflib includes store
-implementations for in memory storage, persistent storage on top
-of the Berkeley DB, and a wrapper for remote SPARQL endpoints.
-
-A SPARQL 1.1 engine is also included.
-
-If you have recently reported a bug marked as fixed, or have a craving for
-the very latest, you may want the development version instead:
-
-   pip install git+https://github.com/rdflib/rdflib
-
-
-Read the docs at:
-
-   http://rdflib.readthedocs.io
-
-    """,
+Unless you have a specific use case for these changes you should
+install upstream rdflib.  https://pypi.org/project/rdflib/
+""",
     packages = packages,
     entry_points = {
         'console_scripts': [
