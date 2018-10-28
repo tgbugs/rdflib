@@ -400,7 +400,7 @@ class NamespaceManager(object):
                     namespace, name = split_uri(uri, NAME_START_CATEGORIES)
                 except ValueError as e:
                     message = ('This graph cannot be serialized to a strict format '
-                               'because there is no valid way to shorten {uri}'.format(uri))
+                               'because there is no valid way to shorten {}'.format(uri))
                     raise ValueError(message)
                     # omitted for strict since NCNames cannot be empty
                     #namespace = URIRef(uri)
