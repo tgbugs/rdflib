@@ -47,12 +47,11 @@ import math
 import base64
 import xml.dom.minidom
 
-from datetime import date, time, datetime
+from datetime import date, time, datetime, timedelta
 from re import sub, compile
 from collections import defaultdict
 
-from isodate import parse_time, parse_date, parse_datetime
-
+from isodate import parse_time, parse_date, parse_datetime, Duration, parse_duration, duration_isoformat
 
 import rdflib
 from six import PY2
@@ -72,15 +71,20 @@ skolems = {}
 
 _invalid_uri_chars = '<>" {}|\\^`'
 
+
 def _is_valid_uri(uri):
     for c in _invalid_uri_chars:
-        if c in uri: return False
+        if c in uri:
+            return False
     return True
+
 
 _lang_tag_regex = compile('^[a-zA-Z]+(?:-[a-zA-Z0-9]+)*$')
 
+
 def _is_valid_langtag(tag):
     return bool(_lang_tag_regex.match(tag))
+
 
 def _is_valid_unicode(value):
     """
@@ -100,6 +104,7 @@ def _is_valid_unicode(value):
     except UnicodeError:
         return False
     return True
+
 
 class Node(object):
     """
@@ -235,7 +240,7 @@ class URIRef(Identifier):
     def toPython(self):
         return text_type(self)
 
-    def n3(self, namespace_manager = None):
+    def n3(self, namespace_manager=None):
         """
         This will do a limited check for valid URIs,
         essentially just making sure that the string includes no illegal
@@ -286,8 +291,6 @@ class URIRef(Identifier):
 
     def __mod__(self, other):
         return self.__class__(text_type(self) % other)
-
-
 
     def de_skolemize(self):
         """ Create a Blank Node from a skolem URI, in accordance
@@ -393,8 +396,8 @@ class BNode(Identifier):
             # as a nodeID for N3 ??  Unless we require these
             # constraints be enforced elsewhere?
             pass  # assert is_ncname(text_type(value)), "BNode identifiers
-                 # must be valid NCNames" _:[A-Za-z][A-Za-z0-9]*
-                 # http://www.w3.org/TR/2004/REC-rdf-testcases-20040210/#nodeID
+            # must be valid NCNames" _:[A-Za-z][A-Za-z0-9]*
+            # http://www.w3.org/TR/2004/REC-rdf-testcases-20040210/#nodeID
         return Identifier.__new__(cls, value)
 
     def toPython(self):
@@ -420,13 +423,17 @@ class BNode(Identifier):
             clsName = self.__class__.__name__
         return """%s('%s')""" % (clsName, str(self))
 
-    def skolemize(self, authority="http://rdlib.net/"):
+    def skolemize(self, authority=None, basepath=None):
         """ Create a URIRef "skolem" representation of the BNode, in accordance
         with http://www.w3.org/TR/rdf11-concepts/#section-skolemization
 
         .. versionadded:: 4.0
         """
-        skolem = "%s%s" % (rdflib_skolem_genid, text_type(self))
+        if authority is None:
+            authority = "http://rdlib.net/"
+        if basepath is None:
+            basepath = rdflib_skolem_genid
+        skolem = "%s%s" % (basepath, text_type(self))
         return URIRef(urljoin(authority, skolem))
 
 
@@ -517,7 +524,6 @@ class Literal(Identifier):
 
     """
 
-
     if not PY3:
         __slots__ = ("language", "datatype", "value", "_language",
                      "_datatype", "_value")
@@ -537,7 +543,7 @@ class Literal(Identifier):
                 "per http://www.w3.org/TR/rdf-concepts/#section-Graph-Literal")
 
         if lang and not _is_valid_langtag(lang):
-            raise Exception("'%s' is not a valid language tag!"%lang)
+            raise Exception("'%s' is not a valid language tag!" % lang)
 
         if datatype:
             datatype = URIRef(datatype)
@@ -557,12 +563,12 @@ class Literal(Identifier):
         elif isinstance(lexical_or_value, string_types):
                 # passed a string
                 # try parsing lexical form of datatyped literal
-                value = _castLexicalToPython(lexical_or_value, datatype)
+            value = _castLexicalToPython(lexical_or_value, datatype)
 
-                if value is not None and normalize:
-                    _value, _datatype = _castPythonToLiteral(value)
-                    if _value is not None and _is_valid_unicode(_value):
-                        lexical_or_value = _value
+            if value is not None and normalize:
+                _value, _datatype = _castPythonToLiteral(value)
+                if _value is not None and _is_valid_unicode(_value):
+                    lexical_or_value = _value
 
         else:
             # passed some python object
@@ -587,7 +593,6 @@ class Literal(Identifier):
         inst._datatype = datatype
         inst._value = value
         return inst
-
 
     def normalize(self):
         """
@@ -631,7 +636,6 @@ class Literal(Identifier):
         self._language = d["language"]
         self._datatype = d["datatype"]
 
-
     def __add__(self, val):
         """
         >>> Literal(1) + 1
@@ -662,7 +666,6 @@ class Literal(Identifier):
     if PY2:
         __nonzero__ = __bool__
 
-
     def __neg__(self):
         """
         >>> (- Literal(1))
@@ -685,7 +688,6 @@ class Literal(Identifier):
         else:
             raise TypeError("Not a number; %s" % repr(self))
 
-
     def __pos__(self):
         """
         >>> (+ Literal(1))
@@ -706,7 +708,6 @@ class Literal(Identifier):
         else:
             raise TypeError("Not a number; %s" % repr(self))
 
-
     def __abs__(self):
         """
         >>> abs(Literal(-1))
@@ -725,7 +726,6 @@ class Literal(Identifier):
             return Literal(self.value.__abs__())
         else:
             raise TypeError("Not a number; %s" % repr(self))
-
 
     def __invert__(self):
         """
@@ -757,31 +757,31 @@ class Literal(Identifier):
         This tries to implement this:
         http://www.w3.org/TR/sparql11-query/#modOrderBy
 
-        In short, Literals with compatible data-types are orderd in value space,
-        i.e.
+        In short, Literals with compatible data-types are ordered in value
+        space, i.e.
         >>> from rdflib import XSD
 
-        >>> Literal(1)>Literal(2) # int/int
+        >>> Literal(1) > Literal(2) # int/int
         False
-        >>> Literal(2.0)>Literal(1) # double/int
+        >>> Literal(2.0) > Literal(1) # double/int
         True
         >>> from decimal import Decimal
         >>> Literal(Decimal("3.3")) > Literal(2.0) # decimal/double
         True
         >>> Literal(Decimal("3.3")) < Literal(4.0) # decimal/double
         True
-        >>> Literal('b')>Literal('a') # plain lit/plain lit
+        >>> Literal('b') > Literal('a') # plain lit/plain lit
         True
-        >>> Literal('b')>Literal('a', datatype=XSD.string) # plain lit/xsd:string
+        >>> Literal('b') > Literal('a', datatype=XSD.string) # plain lit/xsd:str
         True
 
         Incompatible datatype mismatches ordered by DT
 
-        >>> Literal(1)>Literal("2") # int>string
+        >>> Literal(1) > Literal("2") # int>string
         False
 
         Langtagged literals by lang tag
-        >>> Literal("a", lang="en")>Literal("a", lang="fr")
+        >>> Literal("a", lang="en") > Literal("a", lang="fr")
         False
         """
         if other is None:
@@ -790,7 +790,7 @@ class Literal(Identifier):
 
             if self.datatype in _NUMERIC_LITERAL_TYPES and \
                     other.datatype in _NUMERIC_LITERAL_TYPES:
-                return self.value>other.value
+                return self.value > other.value
 
             # plain-literals and xsd:string literals
             # are "the same"
@@ -811,10 +811,10 @@ class Literal(Identifier):
                 else:
                     return self.language > other.language
 
-            if self.value != None and other.value != None:
-                if type(self.value) in _NO_TOTAL_ORDER_TYPES:
-                    comparator = _NO_TOTAL_ORDER_TYPES[type(self.value)]
-                    return comparator(self.value) > comparator(other.value)
+            if self.value is not None and other.value is not None:
+                if type(self.value) in _TOTAL_ORDER_CASTERS:
+                    caster = _TOTAL_ORDER_CASTERS[type(self.value)]
+                    return caster(self.value) > caster(other.value)
                 return self.value > other.value
 
             if text_type(self) != text_type(other):
@@ -935,7 +935,6 @@ class Literal(Identifier):
         if self.datatype:
             res ^= hash(self.datatype)
         return res
-
 
     def __eq__(self, other):
         """
@@ -1075,6 +1074,9 @@ class Literal(Identifier):
         elif isinstance(other, (date, datetime, time)):
             if self.datatype in (_XSD_DATETIME, _XSD_DATE, _XSD_TIME):
                 return self.value == other
+        elif isinstance(other, (timedelta, Duration)):
+            if self.datatype in (_XSD_DURATION, _XSD_DAYTIMEDURATION, _XSD_YEARMONTHDURATION):
+                return self.value == other
         elif isinstance(other, bool):
             if self.datatype == _XSD_BOOLEAN:
                 return self.value == other
@@ -1084,8 +1086,7 @@ class Literal(Identifier):
     def neq(self, other):
         return not self.eq(other)
 
-
-    def n3(self, namespace_manager = None):
+    def n3(self, namespace_manager=None):
         r'''
         Returns a representation in the N3 format.
 
@@ -1139,11 +1140,9 @@ class Literal(Identifier):
             u'"1"^^xsd:integer'
         '''
         if namespace_manager:
-            return self._literal_n3(qname_callback =
-                                    namespace_manager.normalizeUri)
+            return self._literal_n3(qname_callback=namespace_manager.normalizeUri)
         else:
             return self._literal_n3()
-
 
     def _literal_n3(self, use_plain=False, qname_callback=None):
         '''
@@ -1343,6 +1342,7 @@ def _writeXML(xmlnode):
         s = b('')
     return s
 
+
 # Cannot import Namespace/XSD because of circular dependencies
 _XSD_PFX = 'http://www.w3.org/2001/XMLSchema#'
 _RDF_PFX = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#'
@@ -1361,8 +1361,11 @@ _XSD_BOOLEAN = URIRef(_XSD_PFX + 'boolean')
 _XSD_DATETIME = URIRef(_XSD_PFX + 'dateTime')
 _XSD_DATE = URIRef(_XSD_PFX + 'date')
 _XSD_TIME = URIRef(_XSD_PFX + 'time')
+_XSD_DURATION = URIRef(_XSD_PFX + 'duration')
+_XSD_DAYTIMEDURATION = URIRef(_XSD_PFX + 'dayTimeDuration')
+_XSD_YEARMONTHDURATION = URIRef(_XSD_PFX + 'yearMonthDuration')
 
-# TODO: duration, gYearMonth, gYear, gMonthDay, gDay, gMonth
+# TODO: gYearMonth, gYear, gMonthDay, gDay, gMonth
 
 _NUMERIC_LITERAL_TYPES = (
     _XSD_INTEGER,
@@ -1400,14 +1403,23 @@ _NUMERIC_INF_NAN_LITERAL_TYPES = (
     _XSD_DECIMAL,
 )
 
-# these are not guranteed to sort because it is not possible
-# to calculate a total order over all valid members of the type
-# the function must partition the type into subtypes that do have total orders
-_NO_TOTAL_ORDER_TYPES = {
-    datetime:lambda value:bool(value.tzinfo),
-    time:lambda value:bool(value.tzinfo),
-    xml.dom.minidom.Document:lambda value:value.toxml(),
+# the following types need special treatment for reasonable sorting because
+# certain instances can't be compared to each other. We treat this by
+# partitioning and then sorting within those partitions.
+_TOTAL_ORDER_CASTERS = {
+    datetime: lambda value: (
+        # naive vs. aware
+        value.tzinfo is not None and value.tzinfo.utcoffset(value) is not None,
+        value
+    ),
+    time: lambda value: (
+        # naive vs. aware
+        value.tzinfo is not None and value.tzinfo.utcoffset(None) is not None,
+        value
+    ),
+    xml.dom.minidom.Document: lambda value: value.toxml(),
 }
+
 
 def _castPythonToLiteral(obj):
     """
@@ -1437,7 +1449,6 @@ from decimal import Decimal
 # python longs have no limit
 # both map to the abstract integer type,
 # rather than some concrete bit-limited datatype
-
 _PythonToXSD = [
     (string_types, (None, None)),
     (float, (None, _XSD_DOUBLE)),
@@ -1448,6 +1459,8 @@ _PythonToXSD = [
     (datetime, (lambda i:i.isoformat(), _XSD_DATETIME)),
     (date, (lambda i:i.isoformat(), _XSD_DATE)),
     (time, (lambda i:i.isoformat(), _XSD_TIME)),
+    (Duration, (lambda i:duration_isoformat(i), _XSD_DURATION)),
+    (timedelta, (lambda i:duration_isoformat(i), _XSD_DAYTIMEDURATION)),
     (xml.dom.minidom.Document, (_writeXML, _RDF_XMLLITERAL)),
     # this is a bit dirty - by accident the html5lib parser produces
     # DocumentFragments, and the xml parser Documents, letting this
@@ -1457,17 +1470,20 @@ _PythonToXSD = [
 ]
 
 XSDToPython = {
-    None : None, # plain literals map directly to value space
+    None: None,  # plain literals map directly to value space
     URIRef(_XSD_PFX + 'time'): parse_time,
     URIRef(_XSD_PFX + 'date'): parse_date,
     URIRef(_XSD_PFX + 'gYear'): parse_date,
     URIRef(_XSD_PFX + 'gYearMonth'): parse_date,
     URIRef(_XSD_PFX + 'dateTime'): parse_datetime,
+    URIRef(_XSD_PFX + 'duration'): parse_duration,
+    URIRef(_XSD_PFX + 'dayTimeDuration'): parse_duration,
+    URIRef(_XSD_PFX + 'yearMonthDuration'): parse_duration,
     URIRef(_XSD_PFX + 'string'): None,
     URIRef(_XSD_PFX + 'normalizedString'): None,
     URIRef(_XSD_PFX + 'token'): None,
     URIRef(_XSD_PFX + 'language'): None,
-    URIRef(_XSD_PFX + 'boolean'): lambda i: i.lower() in ['1', 'true'],
+    URIRef(_XSD_PFX + 'boolean'): lambda i: i.lower() == 'true',
     URIRef(_XSD_PFX + 'decimal'): Decimal,
     URIRef(_XSD_PFX + 'integer'): long_type,
     URIRef(_XSD_PFX + 'nonPositiveInteger'): int,
@@ -1494,6 +1510,7 @@ _toPythonMapping = {}
 
 _toPythonMapping.update(XSDToPython)
 
+
 def _castLexicalToPython(lexical, datatype):
     """
     Map a lexical form to the value-space for the given datatype
@@ -1516,6 +1533,7 @@ def _castLexicalToPython(lexical, datatype):
         # no convFunc - unknown data-type
         return None
 
+
 def bind(datatype, pythontype, constructor=None, lexicalizer=None):
     """
     register a new datatype<->pythontype binding
@@ -1530,7 +1548,7 @@ def bind(datatype, pythontype, constructor=None, lexicalizer=None):
     """
     if datatype in _toPythonMapping:
         logger.warning("datatype '%s' was already bound. Rebinding." %
-                        datatype)
+                       datatype)
 
     if constructor == None:
         constructor = pythontype
@@ -1564,7 +1582,7 @@ class Variable(Identifier):
     def toPython(self):
         return "?%s" % self
 
-    def n3(self, namespace_manager = None):
+    def n3(self, namespace_manager=None):
         return "?%s" % self
 
     def __reduce__(self):
@@ -1587,6 +1605,7 @@ class Statement(Node, tuple):
     def toPython(self):
         return (self[0], self[1])
 
+
 # Nodes are ordered like this
 # See http://www.w3.org/TR/sparql11-query/#modOrderBy
 # we leave "space" for more subclasses of Node elsewhere
@@ -1597,7 +1616,7 @@ _ORDERING.update({
     Variable: 20,
     URIRef: 30,
     Literal: 40
-    })
+})
 
 
 def _isEqualXMLNode(node, other):
@@ -1629,8 +1648,8 @@ def _isEqualXMLNode(node, other):
 
     elif node.nodeType == Node.ELEMENT_NODE:
         # Get the basics right
-        if not (node.tagName == other.tagName
-                and node.namespaceURI == other.namespaceURI):
+        if not (node.tagName == other.tagName and
+                node.namespaceURI == other.namespaceURI):
             return False
 
         # Handle the (namespaced) attributes; the namespace setting key
@@ -1674,6 +1693,7 @@ def _isEqualXMLNode(node, other):
         # should not happen, in fact
         raise Exception(
             'I dont know how to compare XML Node type: %s' % node.nodeType)
+
 
 if __name__ == '__main__':
     import doctest

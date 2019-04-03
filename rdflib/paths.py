@@ -308,7 +308,6 @@ class AlternativePath(Path):
         return '|'.join(a.n3() for a in self.args)
 
 
-
 class MulPath(Path):
     def __init__(self, path, mod):
         self.path = path
@@ -361,7 +360,7 @@ class MulPath(Path):
                     for s2, o2 in _bwd(None, s, seen):
                         yield s2, o
 
-        def _fwdbwd():
+        def _all_fwd_paths():
             if self.zero:
                 seen1 = set()
                 # According to the spec, ALL nodes are possible solutions
@@ -377,15 +376,17 @@ class MulPath(Path):
                         seen1.add(o)
                         yield o, o
 
+            seen = set()
             for s, o in evalPath(graph, (None, self.path, None)):
                 if not self.more:
                     yield s, o
                 else:
-                    seen = set()
-                    f = list(_fwd(s, None, seen))  # cache or recompute?
-                    for s3, o3 in _bwd(None, o, seen):
-                        for s2, o2 in f:
-                            yield s3, o2  # ?
+                    if s not in seen:
+                        seen.add(s)
+                        f = list(_fwd(s, None, set()))
+                        for s1, o1 in f:
+                            assert s1 == s
+                            yield(s1, o1)
 
         done = set()  # the spec does by defn. not allow duplicates
         if subj:
@@ -399,7 +400,7 @@ class MulPath(Path):
                     done.add(x)
                     yield x
         else:
-            for x in _fwdbwd():
+            for x in _all_fwd_paths():
                 if x not in done:
                     done.add(x)
                     yield x
@@ -408,8 +409,7 @@ class MulPath(Path):
         return "Path(%s%s)" % (self.path, self.mod)
 
     def n3(self):
-        return '%s%s' % (self.path, self.mod)
-
+        return '%s%s' % (self.path.n3(), self.mod)
 
 
 class NegatedPath(Path):
@@ -469,6 +469,7 @@ def path_sequence(self, other):
 def evalPath(graph, t):
     return ((s, o) for s, p, o in graph.triples(t))
 
+
 def mul_path(p, mul):
     """
     cardinality path
@@ -488,7 +489,6 @@ def neg_path(p):
     negated path
     """
     return NegatedPath(p)
-
 
 
 if __name__ == '__main__':

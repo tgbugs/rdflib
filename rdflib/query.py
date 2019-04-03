@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+import itertools
 import shutil
 import tempfile
 import warnings
@@ -15,8 +16,6 @@ from six.moves.urllib.parse import urlparse
 
 __all__ = ['Processor', 'Result', 'ResultParser', 'ResultSerializer',
            'ResultException']
-
-
 
 
 class Processor(object):
@@ -35,6 +34,7 @@ class Processor(object):
     def query(self, strOrQuery, initBindings={}, initNs={}, DEBUG=False):
         pass
 
+
 class UpdateProcessor(object):
     """
     Update plugin interface.
@@ -50,8 +50,10 @@ class UpdateProcessor(object):
 
     def __init__(self, graph):
         pass
+
     def update(self, strOrQuery, initBindings={}, initNs={}):
         pass
+
 
 class ResultException(Exception):
     pass
@@ -165,6 +167,7 @@ class Result(object):
     len(result) also works.
 
     """
+
     def __init__(self, type_):
 
         if type_ not in ('CONSTRUCT', 'DESCRIBE', 'SELECT', 'ASK'):
@@ -185,7 +188,7 @@ class Result(object):
         return self._bindings
 
     def _set_bindings(self, b):
-        if isinstance(b, types.GeneratorType):
+        if isinstance(b, (types.GeneratorType, itertools.islice)):
             self._genbindings = b
             self._bindings = []
         else:
@@ -195,10 +198,11 @@ class Result(object):
         _get_bindings, _set_bindings, doc="a list of variable bindings as dicts")
 
     @staticmethod
-    def parse(source, format='xml', **kwargs):
+    def parse(source=None, format=None, content_type=None, **kwargs):
         from rdflib import plugin
-        parser = plugin.get(format, ResultParser)()
-        return parser.parse(source, **kwargs)
+        parser = plugin.get(format or content_type or 'xml', ResultParser)()
+
+        return parser.parse(source, content_type=content_type, **kwargs)
 
     def serialize(
             self, destination=None, encoding="utf-8", format='xml', **args):
@@ -247,7 +251,7 @@ class Result(object):
         if self.type == 'ASK':
             return self.askAnswer
         else:
-            return len(self)>0
+            return len(self) > 0
 
     if PY2:
         __nonzero__ = __bool__
