@@ -43,6 +43,7 @@ class RecursiveSerializer(Serializer):
     predicateOrder = [RDF.type, RDFS.label]
     maxDepth = 10
     indentString = u"  "
+    roundtrip_prefixes = False
 
     def __init__(self, store):
 
@@ -109,6 +110,10 @@ class RecursiveSerializer(Serializer):
         self._serialized = {}
         self._subjects = {}
         self._topLevels = {}
+
+        if self.roundtrip_prefixes:
+            for prefix, ns in self.store.namespaces():
+                self.addNamespace(prefix, ns)
 
     def buildPredicateHash(self, subject):
         """
