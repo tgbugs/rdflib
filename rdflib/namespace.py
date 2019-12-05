@@ -169,7 +169,7 @@ class ClosedNamespace(object):
     def term(self, name):
         uri = self.__uris.get(name)
         if uri is None:
-            raise AttributeError(
+            raise KeyError(
                 "term '{}' not in namespace '{}'".format(name, self.uri)
             )
         else:
@@ -182,7 +182,10 @@ class ClosedNamespace(object):
         if name.startswith("__"):  # ignore any special Python names!
             raise AttributeError
         else:
-            return self.term(name)
+            try:
+                return self.term(name)
+            except KeyError as e:
+                raise AttributeError(e)
 
     def __str__(self):
         return text_type(self.uri)
@@ -195,6 +198,7 @@ class _RDFNamespace(ClosedNamespace):
     """
     Closed namespace for RDF terms
     """
+
     def __init__(self):
         super(_RDFNamespace, self).__init__(
             URIRef("http://www.w3.org/1999/02/22-rdf-syntax-ns#"),
@@ -281,6 +285,7 @@ class NamespaceManager(object):
         >>>
 
     """
+
     def __init__(self, graph):
         self.graph = graph
         self.__cache = {}
@@ -400,7 +405,7 @@ class NamespaceManager(object):
                     namespace, name = split_uri(uri, NAME_START_CATEGORIES)
                 except ValueError as e:
                     message = ('This graph cannot be serialized to a strict format '
-                               'because there is no valid way to shorten {uri}'.format(uri))
+                               'because there is no valid way to shorten {}'.format(uri))
                     raise ValueError(message)
                     # omitted for strict since NCNames cannot be empty
                     #namespace = URIRef(uri)
@@ -438,7 +443,6 @@ class NamespaceManager(object):
             return self.__cache_strict[uri]
 
     def bind(self, prefix, namespace, override=True, replace=False):
-
         """bind a given namespace to the prefix
 
         if override, rebind, even if the given namespace is already
